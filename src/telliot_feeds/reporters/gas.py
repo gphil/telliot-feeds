@@ -215,7 +215,7 @@ class GasFees:
         # adding 12.5% to base_fee arg to ensure inclusion to at least the next block if not included in current block
         return Wei(int(base_fee * 1.125))
 
-    def get_max_priority_fee(self, spread_gwei: int = 2, fee_history: Optional[FeeHistory] = None) -> Tuple[Optional[Wei], ResponseStatus]:
+    def get_max_priority_fee(self, fee_history: Optional[FeeHistory] = None, spread_gwei: int = 2) -> Tuple[Optional[Wei], ResponseStatus]:
         """Return the max priority fee for a type 2 (EIP1559) transaction with a custom spread above the base fee.
 
         Args:
