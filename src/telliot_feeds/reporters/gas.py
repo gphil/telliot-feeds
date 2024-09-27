@@ -215,13 +215,11 @@ class GasFees:
         # adding 12.5% to base_fee arg to ensure inclusion to at least the next block if not included in current block
         return Wei(int(base_fee * 1.125))
 
-    def get_max_priority_fee(self, fee_history: Optional[FeeHistory] = None) -> Tuple[Optional[Wei], ResponseStatus]:
-        """Return the max priority fee for a type 2 (EIP1559) transaction
-        if priority fee is provided then return the provided priority fee
-        else try to fetch a priority fee suggestion from the node using Eth._max_priority_fee method
-        with a fallback that returns the max priority fee based on the fee history
+    def get_max_priority_fee(self, spread_gwei: float = 2.0, fee_history: Optional[FeeHistory] = None) -> Tuple[Optional[Wei], ResponseStatus]:
+        """Return the max priority fee for a type 2 (EIP1559) transaction with a custom spread above the base fee.
 
         Args:
+            - spread_gwei: The custom spread in gwei above the base fee to set the priority fee (default 2 gwei).
             - fee_history: Optional[FeeHistory]
 
         Returns:
@@ -234,19 +232,34 @@ class GasFees:
             return priority_fee, ResponseStatus()
         else:
             try:
-                max_priority_fee = self.web3.eth._max_priority_fee()
-                return max_priority_fee if max_priority_fee < max_range else max_range, ResponseStatus()
+                # Fetch the base fee
+                _base_fee, status = self.get_base_fee()
+                if _base_fee is None:
+                    return None, error_status("no base fee set", e=status.error, log=logger.error)
+
+                if not isinstance(_base_fee, int):
+                    base_fee = _base_fee["baseFeePerGas"][-1]  # Get the latest base fee from history
+                else:
+                    base_fee = _base_fee
+
+                # Add the spread to the base fee to calculate the priority fee
+                priority_fee = Wei(int(base_fee + Web3.toWei(spread_gwei, "gwei")))
+
+                print(f"Base Fee: {self.to_gwei(base_fee)} Gwei, Priority Fee with spread: {self.to_gwei(priority_fee)} Gwei")
+
+                # Ensure the priority fee is within the max range
+                return priority_fee if priority_fee < max_range else max_range, ResponseStatus()
             except ValueError:
                 logger.warning("unable to fetch max priority fee from node using eth._max_priority_fee_per_gas method.")
-        if fee_history is not None:
-            return fee_history_priority_fee_estimate(fee_history, max_range), ResponseStatus()
-        else:
-            fee_history, status = self.fee_history()
-            if fee_history is None:
-                msg = "unable to fetch history to calculate max priority fee"
-                return None, error_status(msg, e=status.error, log=logger.error)
-            else:
+            if fee_history is not None:
                 return fee_history_priority_fee_estimate(fee_history, max_range), ResponseStatus()
+            else:
+                fee_history, status = self.fee_history()
+                if fee_history is None:
+                    msg = "unable to fetch history to calculate max priority fee"
+                    return None, error_status(msg, e=status.error, log=logger.error)
+                else:
+                    return fee_history_priority_fee_estimate(fee_history, max_range), ResponseStatus()
 
     def get_base_fee(self) -> Tuple[Optional[Union[Wei, FeeHistory]], ResponseStatus]:
         """Return the base fee for a type 2 (EIP1559) transaction.
@@ -294,7 +307,7 @@ class GasFees:
                 msg = "no priority fee set"
                 return None, error_status(msg, e=status.error, log=logger.error)
             # Get max fee
-            max_fee = self.get_max_fee(base_fee)
+            max_fee = priority_fee #self.get_max_fee(base_fee)
             logger.debug(f"base fee: {base_fee}, priority fee: {priority_fee}, max fee: {max_fee}")
         else:
             # if two args are given then we can calculate the third

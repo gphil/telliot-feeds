@@ -83,13 +83,20 @@ class PriceAggregator(DataSource[float]):
             if v is not None and isinstance(v, float):
                 prices.append(v)
 
-        if not prices:
-            logger.warning(f"No prices retrieved for {self}.")
+        if len(prices) < 2:
+            logger.warning("Not enough prices ({}) retrieved for {}.".format(len(prices), self))
             return None, None
 
         # Run the algorithm on all valid prices
         logger.info(f"Running {self.algorithm} on {prices}")
         result = self._algorithm(prices)
+
+        price_divergence = (max(prices) - min(prices)) / result
+        logger.info(f"Cross-price divergence: {price_divergence}")
+        if price_divergence > 0.03:
+            logger.warning(f"Cross-price divergence >3% for {self}!")
+            return None, None
+
         datapoint = (result, datetime_now_utc())
         self.store_datapoint(datapoint)
 
