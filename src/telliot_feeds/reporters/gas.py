@@ -243,7 +243,9 @@ class GasFees:
                     base_fee = _base_fee
 
                 # Convert spread_gwei to an integer amount in Wei
+                print(f"spread_gwei: {spread_gwei}, type: {type(spread_gwei)}")
                 spread_gwei_wei = Web3.toWei(spread_gwei, "gwei")
+                print(f"base_fee: {base_fee}, type: {type(base_fee)}")
 
                 # Add the spread to the base fee to calculate the priority fee
                 priority_fee = Wei(base_fee + spread_gwei_wei)
